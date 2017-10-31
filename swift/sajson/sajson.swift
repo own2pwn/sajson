@@ -17,6 +17,57 @@ public enum ValueReader {
     case array(ArrayReader)
     case object(ObjectReader)
 
+    // Extensions to ease access
+
+    public var intValue: Int {
+        if case .integer(let integer) = self {
+            return Int(integer)
+        }
+        return 0
+    }
+
+    public var doubleValue: Float64 {
+        if case .double(let double) = self {
+            return double
+        }
+        return 0
+    }
+
+    public var boolValue: Bool {
+        if case .bool(let bool) = self {
+            return bool
+        }
+        return false
+    }
+
+    public var stringValue: String {
+        if case .string(let string) = self {
+            return string
+        }
+        return ""
+    }
+
+    public var array: [Value] {
+        var result: [Value] = []
+        if case .array(let reader) = self {
+            result.reserveCapacity(reader.count)
+            for element in reader {
+                result.append(element.value)
+            }
+        }
+        return result
+    }
+
+    public var object: [String: Value] {
+        var result: [String: Value] = [:]
+        if case .object(let reader) = self {
+            for (key, element) in reader {
+                result[key] = element.value
+            }
+        }
+        return result
+    }
+
     // Deeply inflate this ValueReader into a typed Value.
     public var value: Value {
         switch self {
