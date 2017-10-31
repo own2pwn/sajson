@@ -73,7 +73,7 @@ public struct ArrayReader: Sequence {
         self.input = input
     }
 
-    public subscript(i: Int)-> ValueReader {
+    public subscript(i: Int) -> ValueReader {
         if i >= count {
             preconditionFailure("Index out of range: \(i)")
         }
@@ -146,10 +146,13 @@ public struct ObjectReader: Sequence {
         return (key, ASTNode(type: valueType, payload: payload.advanced(by: valueOffset), input: input).valueReader)
     }
 
-    public subscript(key: String) -> ValueReader? {
+    public subscript(key: String) -> ValueReader {
         let objectLocation = sajson_find_object_key(payload, key, key.lengthOfBytes(using: .utf8), input.baseAddress!)
         if objectLocation >= count {
-            return nil
+            #if !PRODUCTION
+                print("objectLocation >= count (\(objectLocation) >= \(count)")
+            #endif
+            return ValueReader.null
         }
 
         let element = payload[3 + objectLocation * 3]
@@ -161,8 +164,8 @@ public struct ObjectReader: Sequence {
     /// Returns the object as a dictionary. Should generally be avoided, as it is less efficient than directly reading
     /// values.
     public func asDictionary() -> [String: ValueReader] {
-        var result = [String: ValueReader](minimumCapacity: self.count)
-        for i in 0..<self.count {
+        var result = [String: ValueReader](minimumCapacity: count)
+        for i in 0..<count {
             let start = Int(payload[1 + i * 3])
             let end = Int(payload[2 + i * 3])
             let value = Int(payload[3 + i * 3])
@@ -196,7 +199,7 @@ public struct ObjectReader: Sequence {
         private var currentIndex = 0
         private let objectReader: ObjectReader
     }
-    
+
     public func makeIterator() -> ObjectReader.Iterator {
         return Iterator(objectReader: self)
     }
@@ -234,7 +237,7 @@ private struct ASTNode {
         static let array: UInt8 = 6
         static let object: UInt8 = 7
     }
-    
+
     fileprivate init(type: UInt8, payload: UnsafePointer<UInt>, input: UnsafeBufferPointer<UInt8>) {
         self.type = type
         self.payload = payload
@@ -246,7 +249,7 @@ private struct ASTNode {
         case RawType.integer:
             // This syntax to read the bottom bits of a UInt as an Int32 is insane.
             return payload.withMemoryRebound(to: Int32.self, capacity: 1) { p in
-                return .integer(p[0])
+                .integer(p[0])
             }
         case RawType.double:
             if MemoryLayout<Int>.size == MemoryLayout<Int32>.size {
@@ -275,7 +278,6 @@ private struct ASTNode {
             fatalError("Unknown sajson value type - memory corruption detected?")
         }
     }
-
 
     // MARK: Private
 
@@ -307,9 +309,10 @@ public final class Document {
         self.rootNode = ASTNode(
             type: rootType,
             payload: rootValuePaylod,
-            input: UnsafeBufferPointer(start: inputPointer, count: inputLength))
+            input: UnsafeBufferPointer(start: inputPointer, count: inputLength)
+        )
     }
-    
+
     deinit {
         sajson_free_document(doc)
     }
@@ -328,7 +331,7 @@ public final class Document {
     /// This accessor is convenient, but for optimum performance, use `withRootValueReader` instead.
     var rootValue: Value {
         return withRootValueReader { rootReader in
-            return rootReader.value
+            rootReader.value
         }
     }
 
@@ -345,7 +348,7 @@ public final class ParseError: Error {
         self.column = column
         self.message = message
     }
-    
+
     public let line: Int
     public let column: Int
     public let message: String
@@ -384,7 +387,8 @@ public func parse(allocationStrategy: AllocationStrategy, mutating: inout Data) 
         throw ParseError(
             line: sajson_get_error_line(dptr),
             column: sajson_get_error_column(dptr),
-            message: String(cString: sajson_get_error_message(dptr)))
+            message: String(cString: sajson_get_error_message(dptr))
+        )
     }
 
     return Document(doc: dptr, input: mutating)
