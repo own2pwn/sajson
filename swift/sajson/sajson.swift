@@ -273,6 +273,36 @@ public enum Value {
     case string(String)
     case array([Value])
     case object([String: Value])
+
+    // Extensions to ease access
+
+    public var stringValue: String {
+        if case .string(let string) = self {
+            return string
+        }
+        return ""
+    }
+
+    public var array: [Value] {
+        var result: [Value] = []
+        if case .array(let reader) = self {
+            result.reserveCapacity(reader.count)
+            for element in reader {
+                result.append(element)
+            }
+        }
+        return result
+    }
+
+    public var object: [String: Value] {
+        var result: [String: Value] = [:]
+        if case .object(let reader) = self {
+            for (key, element) in reader {
+                result[key] = element
+            }
+        }
+        return result
+    }
 }
 
 // Internal type that represents a decodable sajson AST node.
